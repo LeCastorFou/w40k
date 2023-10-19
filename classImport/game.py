@@ -7,10 +7,10 @@ import matplotlib.animation as animation
 from matplotlib.colors import ListedColormap
 
 
-from classImport.weapon import Weapon
-from classImport.miniature import Miniature
-from classImport.units import Unit, UnitList
-from classImport.playground import PlayGround
+from weapon import Weapon
+from miniature import Miniature
+from units import Unit, UnitList
+from playground import PlayGround
 
 class Game:
     def __init__(self,xsize,ysize):
@@ -19,6 +19,28 @@ class Game:
         self.grid = PlayGround([xsize,ysize])
         self.allUnitsP1 =  UnitList()
         self.allUnitsP2 =  UnitList()
+        self.total_reward = 0
+        self.current_reward = 0
+        self.nb_mini_init_p1 = 0
+        self.nb_mini_init_p2 = 0
+        self.nb_mini_p1 = 0
+        self.nb_mini_p2 = 0
+        self.actions_dict = {
+                0: 'N',
+                1: 'NW',
+                2: 'W',
+                3: 'SW',
+                4: 'S',
+                5: 'SE',
+                6: 'E',
+                7: 'NE',
+                8: 'range',
+            }
+        self.num_actions = len(actions_dict)
+        self.status = 'playing'
+
+        # Exploration factor
+        self.epsilon = 0.1
     
     def create_unit(self,unit_name, unit_short_name, fig_attribute, main_fig_pos, weapons, n_fig,player):
         squad = Unit(unit_name,unit_short_name, 2, self.allUnitsP1,self.allUnitsP2)
@@ -41,6 +63,21 @@ class Game:
         for unit in self.allUnitsP2.allUnits:
             print(unit.name)
         print("###########")
+    
+    def get_nb_P1_mini(self):
+        nb = 0
+        for unit in self.allUnitsP1.allUnits:
+            for mini in unit.miniatures:
+                nb += 1
+        return nb
+
+    def get_nb_P2_mini(self):
+        nb = 0
+        for unit in self.allUnitsP2.allUnits:
+            for mini in unit.miniatures:
+                nb += 1
+        return nb
+       
     
     def syncro_squads_units(self):
         # Make all unit aware of the other units
@@ -71,6 +108,75 @@ class Game:
     def updateTempGrid(self):
         self.grid.temporalGrid = np.append(self.grid.temporalGrid, np.array([self.grid.occupation]),axis=0)
     
+    def unitSelection(self,unit_short_name):
+        selected_unit = self.allUnitsP1.allUnits[0]
+        player = 'P1'
+        for e in self.allUnitsP1.allUnits:
+            if unit_short_name == e.shortname:
+                selected_unit = e
+                player = 'P1'
+    
+        for e in self.allUnitsP2.allUnits:
+            if unit_short_name == e.shortname:
+                selected_unit = e
+                player = 'P2'
+       
+        return selected_unit, player
+    
+    def moveUnit(self,unit_short_name,xmove_squad,ymove_squad,is_simu = False):
+        print( 'moving by : x = ', xmove_squad,' / y = ',ymove_squad) if not is_simu else None
+        
+        selected_unit, player = self.unitSelection(unit_short_name)
+  
+        selected_unit.move_unit_through_playground(xmove_squad,ymove_squad,self.grid,player,is_simu=is_simu)
+        self.updateTempGrid()
+    
+    def moveUnitShortCut(self,unit_short_name,is_simu = False):
+        direction = input('Mouvement direction ? N, NW, W, SW, S, SE, E, NE -> ')
+        if direction == 'N':
+            self.moveUnit(unit_short_name,-6,0,is_simu )
+        elif direction == 'NW':
+            self.moveUnit(unit_short_name,-4,4,is_simu)
+        elif direction == 'W':
+            self.moveUnit(unit_short_name,0,6,is_simu )
+        elif direction == 'SW':
+            self.moveUnit(unit_short_name,4,4,is_simu )
+        elif direction == 'S':
+            self.moveUnit(unit_short_name,6,0,is_simu)
+        elif direction == 'SE':
+            self.moveUnit(unit_short_name,4,-4,is_simu)
+        elif direction == 'E':
+            self.moveUnit(unit_short_name,0,-6,is_simu)
+        elif direction == 'NE':
+            self.moveUnit(unit_short_name,-4,-4,is_simu)
+        print( 'moving in direction : x = ', direction,) if not is_simu else None
+    
+    def moveUnitShortCutAuto(self,unit_short_name,direction,is_simu = False):
+        if direction == 'N':
+            self.moveUnit(unit_short_name,-6,0,is_simu )
+        elif direction == 'NW':
+            self.moveUnit(unit_short_name,-4,4,is_simu)
+        elif direction == 'W':
+            self.moveUnit(unit_short_name,0,6,is_simu )
+        elif direction == 'SW':
+            self.moveUnit(unit_short_name,4,4,is_simu )
+        elif direction == 'S':
+            self.moveUnit(unit_short_name,6,0,is_simu)
+        elif direction == 'SE':
+            self.moveUnit(unit_short_name,4,-4,is_simu)
+        elif direction == 'E':
+            self.moveUnit(unit_short_name,0,-6,is_simu)
+        elif direction == 'NE':
+            self.moveUnit(unit_short_name,-4,-4,is_simu)
+
+    
+    def rangeAttack(self, unit_short_name, target_unit, is_simu = False):
+        selected_unit, player = self.unitSelection(unit_short_name)
+        target_unit, player = self.unitSelection(target_unit)
+        selected_unit.distant_combat_attack(target_unit,self.grid,is_simu)
+        self.updateTempGrid()
+        
+
     def launchSimu2Units(self,steps,is_simu):
         # Take fist unit of each player and run random mouvement 
         for i in range(steps):
@@ -124,6 +230,53 @@ class Game:
 
         ani = animation.FuncAnimation(fig, update, frames=range(data.shape[0]), fargs=(data,), interval=1000)
         plt.show()
+    
+    def initNbMinis(self):
+        self.nb_mini_init_p1 = self.get_nb_P1_mini()
+        self.nb_mini_init_p2 = self.get_nb_P2_mini()
+        self.nb_mini_p1 = self.nb_mini_init_p1
+        self.nb_mini_p2 = self.nb_mini_init_p2
+
+    def updateNbMinis(self):
+        # update le nombre de mini a chaque phase pour avoir le dernier nombre
+        self.nb_mini_p1 = self.get_nb_P1_mini()
+        self.nb_mini_p2 = self.get_nb_P2_mini()
+
+    def storeNbMinis(self):
+        self.nb_mini_init_p1 = self.nb_mini_p1
+        self.nb_mini_init_p2 = self.nb_mini_p2
+
+    def get_reward(self):
+        if self.nb_mini_p1 == self.nb_mini_init_p1:
+            self.current_reward = 0.04
+            self.total_reward += self.current_reward
+            print('No loss')
+        
+        if self.nb_mini_p2  == self.nb_mini_init_p2:
+            self.current_reward = -0.06
+            self.total_reward -= self.current_reward
+            print('No loss for the oppo')
+        
+        if self.nb_mini_p2  < self.nb_mini_init_p2:
+            self.current_reward = 0.06
+            self.total_reward += self.current_reward
+            print('Loss for the opp')
+        
+        if self.nb_mini_p2  == 0:
+            self.current_reward = 1
+            self.total_reward += self.current_reward
+            self.status = 'win'
+            print('oppo annilated')
+        
+        if self.nb_mini_p1  == 0:
+            self.current_reward = -1
+            self.total_reward += self.current_reward
+            self.status = 'lose'
+            print('player annilated')
+    
+    def getGameState(self):
+        return self.grid.occupation, self.current_reward, self.status
+
 
     
     

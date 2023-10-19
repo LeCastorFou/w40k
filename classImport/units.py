@@ -2,7 +2,7 @@ import random
 import numpy as np
 import math 
 
-from classImport.miniature import Miniature
+from miniature import Miniature
 
 class UnitList:
     def __init__(self):
@@ -90,6 +90,7 @@ class Unit:
                 except Exception:
                     pass
         if n_in_contact > 0:
+            print(f'Unit of {player} in contact with {oppo_shortname}')
             if player == 'P1':
                 oppoUnits = self.allUnitsP2
             if player == 'P2':
@@ -273,15 +274,17 @@ class Unit:
 
     def distant_combat_attack(self, target_unit,playground,is_simu):
         """Attack another unit in close combat."""
-        print(f"{self.name} is attaking {target_unit.name} ################") if not is_simu else None
+        print(f"####### {self.name} is firing at {target_unit.name} #########") if not is_simu else None
         self.select_weapons('range',is_simu)
+        
         for our_miniature in self.miniatures:
             # Step 1: Check if in range
             for their_miniature in target_unit.miniatures:
-                if math.sqrt(abs(our_miniature.position[0] - their_miniature.position[0])**2 + abs(our_miniature.position[1] - their_miniature.position[1])**2) <= our_miniature.weapon_range  :
+                dist = math.sqrt(abs(our_miniature.position[0] - their_miniature.position[0])**2 + abs(our_miniature.position[1] - their_miniature.position[1])**2)
+                if  dist <= our_miniature.weapon_range  :
                     break  # We found a target miniature in range
             else:
-                print(f"{their_miniature.name} not in range")
+                print(f"{their_miniature.name[:2]} not in range for {our_miniature.name}, distance = {dist} and range = {our_miniature.weapon_range}", )
                 continue  # No miniature in range, try the next one in our unit
 
             # Step 2: Roll to hit
