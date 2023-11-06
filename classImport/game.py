@@ -36,7 +36,7 @@ class Game:
                 7: 'NE',
                 8: 'range',
             }
-        self.num_actions = len(actions_dict)
+        self.num_actions = len(self.actions_dict)
         self.status = 'playing'
 
         # Exploration factor
@@ -78,7 +78,30 @@ class Game:
                 nb += 1
         return nb
        
-    
+    def observe1D(self):
+        array = self.grid.occupation
+        prefix_mapping = {}
+        current_number = 1
+        
+        # Create a mapping of prefixes to numbers
+        for row in array:
+            for item in row:
+                if item.strip():  # Check if the string is not empty and not just spaces
+                    prefix = item[:2]  # Get the first two letters
+                    if prefix not in prefix_mapping:
+                        prefix_mapping[prefix] = current_number
+                        current_number += 1
+        
+        # Replace the prefixes in the array
+        new_array = np.zeros_like(array, dtype=int)
+        for i, row in enumerate(array):
+            for j, item in enumerate(row):
+                if item.strip():
+                    prefix = item[:2]
+                    new_array[i, j] = prefix_mapping[prefix]
+
+        return new_array.reshape((1, -1))
+
     def syncro_squads_units(self):
         # Make all unit aware of the other units
         for unit in self.allUnitsP1.allUnits:
@@ -151,7 +174,7 @@ class Game:
             self.moveUnit(unit_short_name,-4,-4,is_simu)
         print( 'moving in direction : x = ', direction,) if not is_simu else None
     
-    def moveUnitShortCutAuto(self,unit_short_name,direction,is_simu = False):
+    def moveUnitShortCutAuto(self,unit_short_name,direction,is_simu = True):
         if direction == 'N':
             self.moveUnit(unit_short_name,-6,0,is_simu )
         elif direction == 'NW':
@@ -168,7 +191,6 @@ class Game:
             self.moveUnit(unit_short_name,0,-6,is_simu)
         elif direction == 'NE':
             self.moveUnit(unit_short_name,-4,-4,is_simu)
-
     
     def rangeAttack(self, unit_short_name, target_unit, is_simu = False):
         selected_unit, player = self.unitSelection(unit_short_name)
@@ -176,7 +198,6 @@ class Game:
         selected_unit.distant_combat_attack(target_unit,self.grid,is_simu)
         self.updateTempGrid()
         
-
     def launchSimu2Units(self,steps,is_simu):
         # Take fist unit of each player and run random mouvement 
         for i in range(steps):
@@ -275,7 +296,7 @@ class Game:
             print('player annilated')
     
     def getGameState(self):
-        return self.grid.occupation, self.current_reward, self.status
+        return self.observe1D(), self.current_reward, self.status
 
 
     
