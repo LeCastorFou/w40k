@@ -10,6 +10,18 @@ from keras.layers.core import Dense, Activation
 from keras.optimizers import SGD , Adam, RMSprop
 from keras.layers import PReLU
 import matplotlib.pyplot as plt
+import random
+import numpy as np
+import math 
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from matplotlib.colors import ListedColormap
+
+from weapon import Weapon
+from miniature import Miniature
+from units import Unit, UnitList
+from playground import PlayGround
+from game import Game
 
 def format_time(seconds):
     if seconds < 400:
@@ -23,7 +35,7 @@ def format_time(seconds):
         return "%.2f hours" % (h,)
     
 
-def qtrain(model, game, **opt):
+def qtrain(model,xsize,ysize ,**opt):
     epsilon = 0.1
     n_epoch = opt.get('n_epoch', 15000)
     max_memory = opt.get('max_memory', 1000)
@@ -31,6 +43,18 @@ def qtrain(model, game, **opt):
     weights_file = opt.get('weights_file', "")
     name = opt.get('name', 'model')
     start_time = datetime.datetime.now()
+
+    game = Game(xsize,ysize)
+
+    game.create_unit("Space Marine Squad",'sm',(6, 4, 2, 6, 3, 13),(1,1),{'chain saw':Weapon('chain saw','melee',4,0,3,0,4,-1,1),'bolter':Weapon('bolt','range',1,12,0,3,4,0,1)},6,'P1')
+
+    game.create_unit("Ork Boyz Squad",'ok',(5, 5, 1, 6, 6, 7),(game.xsize-5,game.ysize-5),{'choppa':Weapon('choppa','melee',3,0,3,0,4,-1,1),'shoota':Weapon('shoota','range',2,18,0,5,4,0,1)},6,'P2')
+
+    game.syncro_squads_units()
+
+    game.display_all_attached_units()
+
+    game.updateTempGrid()
 
     # If you want to continue training from a previous model,
     # just supply the h5 file name to weights_file option
@@ -64,6 +88,8 @@ def qtrain(model, game, **opt):
             if np.random.rand() < epsilon:
                 action = random.choice(valid_actions)
             else:
+                # NN descision
+                print('NN descision')
                 action = np.argmax(experience.predict(prev_envstate))
             print(f"action : {action}, {game.actions_dict[action]}")
             #game.moveUnitShortCutAuto('sm',game.actions_dict[action])
@@ -131,6 +157,16 @@ def qtrain(model, game, **opt):
 
 def build_model(grid,num_actions, lr=0.001):
     model = Sequential()
+    model.add(Dense(xsize*ysize, input_shape=(xsize*ysize,)))
+    model.add(PReLU())
+    model.add(Dense(xsize*ysize))
+    model.add(PReLU())
+    model.add(Dense(num_actions))
+    model.compile(optimizer='adam', loss='mse')
+    return model
+
+def build_model(grid,num_actions, lr=0.001):
+    model = Sequential()
     model.add(Dense(grid.size, input_shape=(grid.size,)))
     model.add(PReLU())
     model.add(Dense(grid.size))
@@ -139,38 +175,9 @@ def build_model(grid,num_actions, lr=0.001):
     model.compile(optimizer='adam', loss='mse')
     return model
 
-import random
-import numpy as np
-import math 
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-from matplotlib.colors import ListedColormap
+xsize = 40
+ysize = 40
+game = Game(xsize,ysize)
+model = build_model(game.grid.occupation,game.num_actions)
 
-from weapon import Weapon
-from miniature import Miniature
-from units import Unit, UnitList
-from playground import PlayGround
-from game import Game
-
-theGame = Game(40,40)
-
-theGame.create_unit("Space Marine Squad",'sm',(6, 4, 2, 6, 3, 13),(1,1),{'chain saw':Weapon('chain saw','melee',4,0,3,0,4,-1,1),'bolter':Weapon('bolt','range',1,12,0,3,4,0,1)},6,'P1')
-
-theGame.create_unit("Ork Boyz Squad",'ok',(5, 5, 1, 6, 6, 7),(theGame.xsize-5,theGame.ysize-5),{'choppa':Weapon('choppa','melee',3,0,3,0,4,-1,1),'shoota':Weapon('shoota','range',2,18,0,5,4,0,1)},6,'P2')
-
-theGame.syncro_squads_units()
-
-theGame.display_all_attached_units()
-
-theGame.updateTempGrid()
-
-#theGame.moveUnitShortCut('sm')
-#theGame.rangeAttack('sm', 'ok', is_simu = False)
-print(theGame.grid.occupation)
-print(theGame.observe1D())
-
-model = build_model(theGame.grid.occupation,theGame.num_actions)
-
-theGame.observe1D()
-
-qtrain(model, theGame, n_epoch=10, max_memory=8*theGame.observe1D().size, data_size=32)
+qtrain(model,xsize,ysize, n_epoch=10, max_memory=8*xsize*ysize, data_size=32)
